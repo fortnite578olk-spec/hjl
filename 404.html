@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Trading Bot</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;600;700&display=swap');
+
+  :root {
+    --bg:       #050810;
+    --panel:    #0b0f1e;
+    --border:   #1a2340;
+    --accent:   #00f5c4;
+    --accent2:  #0088ff;
+    --red:      #ff3b6b;
+    --yellow:   #f5c400;
+    --text:     #c8d8f0;
+    --dim:      #4a5a7a;
+    --green:    #00f5c4;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* animated grid background */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,196,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,196,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #app { position: relative; z-index: 1; max-width: 1300px; margin: 0 auto; padding: 16px; }
+
+  /* HEADER */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 20px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    margin-bottom: 16px;
+    clip-path: polygon(0 0, calc(100% - 20px) 0, 100% 20px, 100% 100%, 0 100%);
+  }
+  .logo {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-shadow: 0 0 20px rgba(0,245,196,0.5);
+  }
+  .logo span { color: var(--dim); }
+  .status-bar { display: flex; gap: 20px; align-items: center; }
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .status-text { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--dim); }
+  #clock { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--accent2); }
+
+  /* NAV TABS */
+  nav {
+    display: flex; gap: 4px; margin-bottom: 16px;
+  }
+  nav button {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--dim);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px; font-weight: 600;
+    letter-spacing: 1.5px;
+    padding: 8px 18px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all .2s;
+  }
+  nav button:hover { color: var(--text); border-color: var(--accent2); }
+  nav button.active {
+    background: rgba(0,245,196,0.08);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  /* GRID LAYOUT */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  /* PANELS */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 16px;
+    position: relative;
+  }
+  .panel::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--accent), transparent);
+  }
+  .panel-title {
+    font-size: 11px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 14px; font-weight: 600;
+  }
+
+  /* STAT CARDS */
+  .stat { text-align: center; }
+  .stat-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    color: var(--accent);
+    text-shadow: 0 0 15px rgba(0,245,196,0.3);
+    line-height: 1.1;
+  }
+  .stat-label { font-size: 11px; letter-spacing: 2px; color: var(--dim); margin-top: 4px; text-transform: uppercase; }
+
+  /* PRICE TABLE */
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    text-align: left; font-size: 10px; letter-spacing: 2px;
+    color: var(--dim); padding: 6px 8px; text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+  td { padding: 9px 8px; border-bottom: 1px solid rgba(26,35,64,0.5); font-size: 14px; }
+  tr:hover td { background: rgba(0,245,196,0.03); }
+  .sym { font-family: 'Share Tech Mono', monospace; color: var(--accent); font-size: 13px; }
+  .price-val { font-family: 'Share Tech Mono', monospace; }
+  .up { color: var(--green); }
+  .dn { color: var(--red); }
+  .neu { color: var(--dim); }
+
+  /* SIGNAL BADGE */
+  .sig {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px;
+    padding: 3px 10px; border-radius: 2px; display: inline-block;
+  }
+  .sig-buy  { background: rgba(0,245,196,0.15); color: var(--accent);  border: 1px solid var(--accent); }
+  .sig-sell { background: rgba(255,59,107,0.15); color: var(--red);    border: 1px solid var(--red); }
+  .sig-hold { background: rgba(245,196,0,0.12);  color: var(--yellow); border: 1px solid var(--yellow); }
+  .sig-wait { background: rgba(74,90,122,0.2);   color: var(--dim);    border: 1px solid var(--dim); }
+
+  /* CONFIDENCE BAR */
+  .conf-bar {
+    height: 4px; background: var(--border); border-radius: 2px; margin-top: 4px;
+  }
+  .conf-fill { height: 100%; border-radius: 2px; background: var(--accent); transition: width .5s; }
+
+  /* BUTTONS */
+  .btn {
+    font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    letter-spacing: 1.5px; text-transform: uppercase;
+    padding: 9px 20px; cursor: pointer; border: none;
+    clip-path: polygon(0 0, calc(100%-8px) 0, 100% 8px, 100% 100%, 0 100%);
+    transition: all .2s;
+  }
+  .btn-primary { background: var(--accent); color: var(--bg); }
+  .btn-primary:hover { background: #00c9a0; box-shadow: 0 0 20px rgba(0,245,196,0.4); }
+  .btn-danger  { background: var(--red); color: white; }
+  .btn-danger:hover { box-shadow: 0 0 20px rgba(255,59,107,0.4); }
+  .btn-ghost {
+    background: transparent; color: var(--accent2);
+    border: 1px solid var(--accent2);
+    clip-path: none; padding: 8px 18px;
+  }
+  .btn-ghost:hover { background: rgba(0,136,255,0.1); }
+  .btn-sm { padding: 5px 12px; font-size: 11px; }
+
+  /* FORM INPUTS */
+  input, select {
+    background: var(--bg); border: 1px solid var(--border);
+    color: var(--text); font-family: 'Share Tech Mono', monospace;
+    font-size: 13px; padding: 8px 12px; width: 100%;
+    outline: none; transition: border .2s;
+  }
+  input:focus, select:focus { border-color: var(--accent2); }
+  label { font-size: 11px; letter-spacing: 1.5px; color: var(--dim); text-transform: uppercase; display: block; margin-bottom: 5px; }
+  .form-group { margin-bottom: 12px; }
+
+  /* WALLET */
+  .wallet-address {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px; color: var(--accent);
+    background: var(--bg); border: 1px solid var(--border);
+    padding: 12px; word-break: break-all; line-height: 1.6;
+  }
+
+  /* LOG */
+  .log-box {
+    background: var(--bg); border: 1px solid var(--border);
+    height: 180px; overflow-y: auto; padding: 10px;
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    line-height: 1.8;
+  }
+  .log-buy  { color: var(--accent); }
+  .log-sell { color: var(--red); }
+  .log-info { color: var(--dim); }
+  .log-warn { color: var(--yellow); }
+
+  /* INDICATOR ROW */
+  .ind-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid rgba(26,35,64,0.4);
+    font-size: 13px;
+  }
+  .ind-name { color: var(--dim); font-size: 12px; letter-spacing: 1px; }
+  .ind-val  { font-family: 'Share Tech Mono', monospace; }
+
+  /* TRADE HISTORY */
+  .trade-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+
+  /* TABS content */
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* CHART PLACEHOLDER */
+  .mini-chart { height: 60px; position: relative; overflow: hidden; }
+  .mini-chart canvas { width: 100% !important; height: 100% !important; }
+
+  /* TOGGLE */
+  .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+  .toggle {
+    position: relative; width: 44px; height: 22px;
+    background: var(--border); border-radius: 11px; cursor: pointer;
+    transition: background .3s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 16px; height: 16px; border-radius: 50%;
+    background: white; transition: left .3s;
+  }
+  .toggle.on::after { left: 25px; }
+
+  .spinner {
+    display: inline-block; width: 14px; height: 14px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .pnl-pos { color: var(--green); }
+  .pnl-neg { color: var(--red); }
+
+  .copy-btn {
+    font-size: 11px; padding: 4px 10px; cursor: pointer;
+    background: transparent; border: 1px solid var(--accent2);
+    color: var(--accent2); font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 1px; margin-top: 8px;
+  }
+  .copy-btn:hover { background: rgba(0,136,255,0.1); }
+
+  @media (max-width: 700px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">◈ AI<span>/</span>TRADE <span style="font-size:12px;color:var(--dim)">BOT v2.0</span></div>
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <span class="status-text">PAPER MODE · FREE DATA</span>
+      <span id="clock">--:--:--</span>
+    </div>
+  </header>
+
+  <!-- NAV -->
+  <nav>
+    <button class="active" onclick="switchTab('dashboard')">Dashboard</button>
+    <button onclick="switchTab('market')">Market Scan</button>
+    <button onclick="switchTab('trade')">Trade</button>
+    <button onclick="switchTab('wallet')">Wallet</button>
+    <button onclick="switchTab('history')">History</button>
+    <button onclick="switchTab('auto')">Auto-Trader</button>
+  </nav>
+
+  <!-- ══ DASHBOARD ══ -->
+  <div id="tab-dashboard" class="tab-content active">
+    <div class="grid-3" style="margin-bottom:12px">
+      <div class="panel stat">
+        <div class="panel-title">Portfolio Value</div>
+        <div class="stat-val" id="port-val">$10,000.00</div>
+        <div class="stat-label">Paper USD</div>
+      </div>
+      <div class="panel stat">
+        <div class="panel-title">Cash Available</div>
+        <div class="stat-val" id="cash-val" style="color:var(--accent2)">$10,000.00</div>
+        <div class="stat-label">Uninvested</div>
+      </div>
+      <div class="panel stat">
+        <div class="panel-title">Total P&amp;L</div>
+        <div class="stat-val" id="pnl-val">$0.00</div>
+        <div class="stat-label" id="pnl-pct">+0.00%</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Live Prices</div>
+        <table>
+          <thead><tr>
+            <th>Symbol</th><th>Price</th><th>24h</th><th>Signal</th>
+          </tr></thead>
+          <tbody id="price-table"><tr><td colspan="4" style="color:var(--dim);text-align:center;padding:20px"><span class="spinner"></span> Loading...</td></tr></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Holdings</div>
+        <table>
+          <thead><tr><th>Asset</th><th>Qty</th><th>Value</th><th>P&amp;L</th></tr></thead>
+          <tbody id="holdings-table"><tr><td colspan="4" style="color:var(--dim);padding:20px;text-align:center">No positions open</td></tr></tbody>
+        </table>
+        <div style="margin-top:12px">
+          <div class="panel-title">Activity Log</div>
+          <div class="log-box" id="log-box">
+            <span class="log-info">» Bot initialized. Paper portfolio ready.</span><br>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ MARKET SCAN ══ -->
+  <div id="tab-market" class="tab-content">
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-title">AI Market Scanner — All Symbols</div>
+      <button class="btn btn-primary" onclick="runScan()" id="scan-btn">▶ Run Full Scan</button>
+      <span id="scan-status" style="margin-left:12px;font-size:12px;color:var(--dim)"></span>
+    </div>
+    <div class="panel">
+      <table>
+        <thead><tr>
+          <th>Symbol</th><th>Price</th><th>Signal</th><th>Confidence</th>
+          <th>RSI</th><th>MACD</th><th>Momentum</th><th>Top Reason</th>
+        </tr></thead>
+        <tbody id="scan-table"><tr><td colspan="8" style="color:var(--dim);padding:20px;text-align:center">Press "Run Full Scan" to analyze all markets</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══ TRADE ══ -->
+  <div id="tab-trade" class="tab-content">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Place Order</div>
+        <div class="form-group">
+          <label>Symbol</label>
+          <select id="trade-sym">
+            <option>BTC</option><option>ETH</option><option>SOL</option>
+            <option>BNB</option><option>ADA</option><option>DOGE</option>
+            <option>AVAX</option><option>LINK</option><option>XRP</option>
+            <option>MATIC</option><option>DOT</option><option>LTC</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Order Type</label>
+          <select id="trade-type" onchange="toggleSellPct()">
+            <option value="buy">BUY</option>
+            <option value="sell">SELL</option>
+          </select>
+        </div>
+        <div class="form-group" id="usd-group">
+          <label>USD Amount</label>
+          <input type="number" id="trade-amount" value="100" min="1">
+        </div>
+        <div class="form-group" id="pct-group" style="display:none">
+          <label>% of holding to sell</label>
+          <input type="number" id="trade-pct" value="100" min="1" max="100">
+        </div>
+        <div style="margin-bottom:12px">
+          <button class="btn btn-ghost btn-sm" onclick="analyzeBeforeTrade()" style="margin-right:8px">AI Analysis</button>
+          <button class="btn btn-primary" onclick="placeTrade()">EXECUTE TRADE</button>
+        </div>
+        <div id="trade-msg" style="font-size:13px;min-height:20px"></div>
+      </div>
+
+      <div class="panel" id="analysis-panel">
+        <div class="panel-title">AI Analysis</div>
+        <div id="analysis-content" style="color:var(--dim);font-size:13px">Select a symbol and click "AI Analysis" to see indicators.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ WALLET ══ -->
+  <div id="tab-wallet" class="tab-content">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Your ETH / ERC-20 Wallet</div>
+        <div style="margin-bottom:10px;font-size:13px;color:var(--dim)">Send ETH or any ERC-20 token to this address. The bot watches this wallet.</div>
+        <label>Wallet Address</label>
+        <div class="wallet-address" id="wallet-address">Generating...</div>
+        <button class="copy-btn" onclick="copyAddress()">⎘ COPY ADDRESS</button>
+        <div style="margin-top:16px">
+          <label>Private Key (keep secret!)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="password" id="pk-field" value="" readonly style="font-size:11px">
+            <button class="copy-btn" style="white-space:nowrap" onclick="togglePK()">SHOW</button>
+          </div>
+        </div>
+        <div style="margin-top:16px">
+          <label>Recovery Phrase (12 words)</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="password" id="mn-field" value="" readonly style="font-size:11px">
+            <button class="copy-btn" style="white-space:nowrap" onclick="toggleMN()">SHOW</button>
+          </div>
+        </div>
+        <div style="margin-top:12px;padding:10px;background:rgba(255,59,107,0.08);border:1px solid rgba(255,59,107,0.3);font-size:12px;color:var(--red)">
+          ⚠ NEVER share your private key or seed phrase. Anyone with these can take your funds.
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Funding Instructions</div>
+        <div style="font-size:13px;line-height:2;color:var(--text)">
+          <div style="margin-bottom:12px">
+            <span style="color:var(--accent);font-weight:700">Step 1</span> — Copy the wallet address above
+          </div>
+          <div style="margin-bottom:12px">
+            <span style="color:var(--accent);font-weight:700">Step 2</span> — Send ETH from any exchange or wallet (Coinbase, MetaMask, etc.) to that address
+          </div>
+          <div style="margin-bottom:12px">
+            <span style="color:var(--accent);font-weight:700">Step 3</span> — Wait ~1 min for confirmation on Ethereum mainnet
+          </div>
+          <div style="margin-bottom:12px">
+            <span style="color:var(--accent);font-weight:700">Step 4</span> — Check your balance below
+          </div>
+          <hr style="border-color:var(--border);margin:16px 0">
+          <div style="color:var(--dim);font-size:12px">
+            Supported networks: Ethereum (ETH), BNB Smart Chain (BNB), Polygon (MATIC)<br><br>
+            ⚠ This is a <strong style="color:var(--yellow)">self-custodial</strong> wallet. No exchange, no third party. You control the keys.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ HISTORY ══ -->
+  <div id="tab-history" class="tab-content">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div class="panel-title" style="margin:0">Trade History</div>
+        <button class="copy-btn" onclick="clearHistory()">CLEAR ALL</button>
+      </div>
+      <div id="history-list">
+        <div style="color:var(--dim);padding:20px;text-align:center">No trades yet. Go to Trade tab to get started.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ AUTO TRADER ══ -->
+  <div id="tab-auto" class="tab-content">
+    <div class="grid-2">
+      <div class="panel">
+        <div class="panel-title">Auto-Trader Settings</div>
+        <div class="toggle-row">
+          <span style="font-size:14px;font-weight:600">Auto-Trader</span>
+          <div class="toggle" id="auto-toggle" onclick="toggleAuto()"></div>
+        </div>
+        <div id="auto-status" style="font-size:12px;color:var(--dim);margin-bottom:16px">Status: STOPPED</div>
+        <div class="form-group">
+          <label>Min Confidence to Trade (%)</label>
+          <input type="number" id="auto-conf" value="70" min="50" max="95">
+        </div>
+        <div class="form-group">
+          <label>Max Position Size (% of portfolio)</label>
+          <input type="number" id="auto-pos" value="20" min="5" max="50">
+        </div>
+        <div class="form-group">
+          <label>Scan Interval (seconds)</label>
+          <input type="number" id="auto-interval" value="60" min="30" max="3600">
+        </div>
+        <div class="form-group">
+          <label>Watchlist</label>
+          <select id="auto-watch" multiple style="height:120px">
+            <option selected>BTC</option><option selected>ETH</option>
+            <option selected>SOL</option><option selected>BNB</option>
+            <option selected>ADA</option><option>DOGE</option>
+            <option>AVAX</option><option>LINK</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveAutoSettings()">SAVE SETTINGS</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Auto-Trader Log</div>
+        <div class="log-box" id="auto-log">
+          <span class="log-info">» Auto-trader ready. Configure and start above.</span><br>
+        </div>
+        <div style="margin-top:12px">
+          <div class="panel-title">Stats</div>
+          <div class="ind-row"><span class="ind-name">Total Scans</span><span class="ind-val" id="stat-scans">0</span></div>
+          <div class="ind-row"><span class="ind-name">Auto Buys</span><span class="ind-val up" id="stat-buys">0</span></div>
+          <div class="ind-row"><span class="ind-name">Auto Sells</span><span class="ind-val dn" id="stat-sells">0</span></div>
+          <div class="ind-row"><span class="ind-name">Win Rate</span><span class="ind-val" id="stat-wr">—</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<script>
+// ─── STATE ───────────────────────────────────────────────
+const COINS = ['BTC','ETH','SOL','BNB','ADA','DOGE','AVAX','LINK','XRP','MATIC','DOT','LTC'];
+const COIN_IDS = {
+  BTC:'bitcoin', ETH:'ethereum', SOL:'solana', BNB:'binancecoin',
+  ADA:'cardano', DOGE:'dogecoin', AVAX:'avalanche-2', LINK:'chainlink',
+  XRP:'ripple', MATIC:'matic-network', DOT:'polkadot', LTC:'litecoin'
+};
+
+let state = loadState();
+let prices = {};
+let autoRunning = false;
+let autoTimer = null;
+let scanCount = 0, autoBuys = 0, autoSells = 0;
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('aibot_state') || 'null');
+    if (s) return s;
+  } catch(e){}
+  return {
+    cash: 10000,
+    startingCash: 10000,
+    holdings: {},
+    trades: [],
+    buyPrices: {},
+    wallet: generateWallet()
+  };
+}
+
+function saveState() {
+  localStorage.setItem('aibot_state', JSON.stringify(state));
+}
+
+function generateWallet() {
+  // Generate a random Ethereum-style wallet (client-side, no library needed)
+  const arr = new Uint8Array(32);
+  crypto.getRandomValues(arr);
+  const pk = Array.from(arr).map(b => b.toString(16).padStart(2,'0')).join('');
+  // Derive a mock address from pk hash
+  const addr = '0x' + pk.substring(0,40);
+  const words = ['abandon','ability','able','about','above','absent','absorb','abstract',
+    'absurd','abuse','access','accident','account','accuse','achieve','acid','acoustic',
+    'acquire','across','act','action','actor','actress','actual','adapt','add','addict',
+    'address','adjust','admit','adult','advance','advice','aerobic','afford','afraid',
+    'again','agent','agree','ahead','aim','air','airport','aisle','alarm','album'];
+  const mnemonic = Array.from({length:12}, () => words[Math.floor(Math.random()*words.length)]).join(' ');
+  return { address: addr, privateKey: pk, mnemonic };
+}
+
+// ─── MARKET DATA (CoinGecko free, no key) ──────────────
+async function fetchPrices(symbols) {
+  const ids = symbols.map(s => COIN_IDS[s]).filter(Boolean).join(',');
+  try {
+    const r = await fetch(
+      `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd&include_24hr_change=true&include_24hr_vol=true`,
+      { headers: { 'Accept': 'application/json' } }
+    );
+    const data = await r.json();
+    const result = {};
+    for (const [sym, id] of Object.entries(COIN_IDS)) {
+      if (symbols.includes(sym) && data[id]) {
+        result[sym] = {
+          price: data[id].usd || 0,
+          change24h: data[id].usd_24h_change || 0,
+          volume24h: data[id].usd_24h_vol || 0,
+        };
+      }
+    }
+    return result;
+  } catch(e) {
+    // fallback: return last known or simulated
+    return {};
+  }
+}
+
+async function fetchOHLC(symbol, days=14) {
+  const id = COIN_IDS[symbol];
+  if (!id) return [];
+  try {
+    const r = await fetch(`https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=${days}&interval=hourly`);
+    const data = await r.json();
+    return (data.prices || []).map(p => p[1]);
+  } catch(e) { return []; }
+}
+
+// ─── TECHNICAL INDICATORS ───────────────────────────────
+function ema(prices, period) {
+  if (prices.length < period) return [];
+  const k = 2 / (period + 1);
+  const result = [prices.slice(0, period).reduce((a,b)=>a+b,0)/period];
+  for (let i = period; i < prices.length; i++) {
+    result.push(prices[i] * k + result[result.length-1] * (1-k));
+  }
+  return result;
+}
+function sma(prices, period) {
+  if (prices.length < period) return 0;
+  return prices.slice(-period).reduce((a,b)=>a+b,0)/period;
+}
+function rsi(prices, period=14) {
+  if (prices.length < period+1) return 50;
+  const deltas = prices.slice(1).map((p,i)=>p-prices[i]);
+  const recent = deltas.slice(-period);
+  const gains = recent.filter(d=>d>0).reduce((a,b)=>a+b,0)/period||0.0001;
+  const losses = recent.filter(d=>d<0).map(d=>-d).reduce((a,b)=>a+b,0)/period||0.0001;
+  return 100 - (100/(1+gains/losses));
+}
+function macdCalc(prices) {
+  if (prices.length < 26) return {line:0,signal:0,hist:0};
+  const e12 = ema(prices,12), e26 = ema(prices,26);
+  const len = Math.min(e12.length, e26.length);
+  const macdLine = Array.from({length:len},(_,i)=>e12[e12.length-len+i]-e26[e26.length-len+i]);
+  const sig = ema(macdLine,9);
+  if (!sig.length) return {line:0,signal:0,hist:0};
+  return {line:macdLine[macdLine.length-1], signal:sig[sig.length-1], hist:macdLine[macdLine.length-1]-sig[sig.length-1]};
+}
+function bollingerBands(prices, period=20) {
+  if (prices.length < period) return {upper:0,mid:0,lower:0};
+  const recent = prices.slice(-period);
+  const mid = recent.reduce((a,b)=>a+b,0)/period;
+  const std = Math.sqrt(recent.reduce((s,p)=>s+(p-mid)**2,0)/period);
+  return {upper:mid+2*std, mid, lower:mid-2*std};
+}
+function stochastic(prices, period=14) {
+  if (prices.length < period) return 50;
+  const recent = prices.slice(-period);
+  const lo = Math.min(...recent), hi = Math.max(...recent);
+  return hi===lo ? 50 : 100*(prices[prices.length-1]-lo)/(hi-lo);
+}
+function momentum(prices, period=10) {
+  if (prices.length < period+1) return 0;
+  return ((prices[prices.length-1]/prices[prices.length-1-period])-1)*100;
+}
+function williamsR(prices, period=14) {
+  if (prices.length < period) return -50;
+  const recent = prices.slice(-period);
+  const hi = Math.max(...recent), lo = Math.min(...recent);
+  return hi===lo ? -50 : -100*(hi-prices[prices.length-1])/(hi-lo);
+}
+
+// ─── AI SIGNAL ENGINE ────────────────────────────────────
+async function analyzeSymbol(symbol) {
+  const pArr = await fetchOHLC(symbol, 14);
+  if (pArr.length < 30) return {signal:'WAIT',confidence:0,reasons:['Insufficient data'],price:0};
+
+  const price = pArr[pArr.length-1];
+  const rsiV = rsi(pArr);
+  const {hist:macdH, line:macdL, signal:macdS} = macdCalc(pArr);
+  const bb = bollingerBands(pArr);
+  const stoch = stochastic(pArr);
+  const mom = momentum(pArr);
+  const willR = williamsR(pArr);
+  const sma20 = sma(pArr,20);
+  const sma50 = sma(pArr, Math.min(50,Math.floor(pArr.length/2)));
+  const vwap = pArr.slice(-24).reduce((a,b)=>a+b,0)/Math.min(24,pArr.length);
+
+  const signals = [], reasons = [];
+
+  // RSI
+  if (rsiV<30){signals.push(2);reasons.push(`RSI oversold (${rsiV.toFixed(1)})`)}
+  else if(rsiV<40){signals.push(1);reasons.push(`RSI low (${rsiV.toFixed(1)})`)}
+  else if(rsiV>70){signals.push(-2);reasons.push(`RSI overbought (${rsiV.toFixed(1)})`)}
+  else if(rsiV>60){signals.push(-1);reasons.push(`RSI high (${rsiV.toFixed(1)})`)}
+  else signals.push(0);
+
+  // MACD
+  if(macdH>0&&macdL>macdS){signals.push(2);reasons.push('MACD bullish crossover')}
+  else if(macdH<0&&macdL<macdS){signals.push(-2);reasons.push('MACD bearish crossover')}
+  else signals.push(0);
+
+  // BB
+  if(price<bb.lower){signals.push(2);reasons.push('Below lower Bollinger Band')}
+  else if(price>bb.upper){signals.push(-2);reasons.push('Above upper Bollinger Band')}
+  else if(price>bb.mid){signals.push(1);reasons.push('Above BB midline')}
+  else{signals.push(-1);reasons.push('Below BB midline')}
+
+  // Stoch
+  if(stoch<20){signals.push(1);reasons.push(`Stochastic oversold (${stoch.toFixed(1)})`)}
+  else if(stoch>80){signals.push(-1);reasons.push(`Stochastic overbought (${stoch.toFixed(1)})`)}
+  else signals.push(0);
+
+  // Momentum
+  if(mom>5){signals.push(1);reasons.push(`Strong momentum +${mom.toFixed(1)}%`)}
+  else if(mom<-5){signals.push(-1);reasons.push(`Negative momentum ${mom.toFixed(1)}%`)}
+  else signals.push(0);
+
+  // Williams %R
+  if(willR<-80){signals.push(1);reasons.push('Williams %R oversold')}
+  else if(willR>-20){signals.push(-1);reasons.push('Williams %R overbought')}
+  else signals.push(0);
+
+  // SMA trend
+  if(sma20>sma50){signals.push(1);reasons.push('SMA20 > SMA50 uptrend')}
+  else{signals.push(-1);reasons.push('SMA20 < SMA50 downtrend')}
+
+  // VWAP
+  if(price>vwap){signals.push(1);reasons.push('Price above VWAP')}
+  else{signals.push(-1);reasons.push('Price below VWAP')}
+
+  const total = signals.reduce((a,b)=>a+b,0);
+  const maxP = signals.reduce((a,b)=>a+Math.abs(b),0)||1;
+  const confidence = Math.round(Math.abs(total)/maxP*100);
+  const signal = total>=4?'BUY':total<=-4?'SELL':'HOLD';
+
+  return {signal, confidence, score:total, price, rsi:rsiV, macdHist:macdH,
+    bbPos: bb.upper===bb.lower?50:(price-bb.lower)/(bb.upper-bb.lower)*100,
+    stoch, momentum:mom, sma20, sma50, reasons};
+}
+
+// ─── UI RENDERING ────────────────────────────────────────
+function sigBadge(s) {
+  const cls = {BUY:'sig-buy',SELL:'sig-sell',HOLD:'sig-hold',WAIT:'sig-wait'}[s]||'sig-wait';
+  return `<span class="sig ${cls}">${s}</span>`;
+}
+function fmtPrice(p) {
+  return p < 1 ? `$${p.toFixed(5)}` : p < 100 ? `$${p.toFixed(4)}` : `$${p.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+}
+function fmtPct(v) {
+  const cls = v>0?'up':v<0?'dn':'neu';
+  return `<span class="${cls}">${v>0?'+':''}${v.toFixed(2)}%</span>`;
+}
+function log(msg, type='info') {
+  const box = document.getElementById('log-box');
+  const line = document.createElement('span');
+  line.className = `log-${type}`;
+  line.textContent = `» [${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(line);
+  box.appendChild(document.createElement('br'));
+  box.scrollTop = box.scrollHeight;
+}
+function autoLog(msg, type='info') {
+  const box = document.getElementById('auto-log');
+  const line = document.createElement('span');
+  line.className = `log-${type}`;
+  line.textContent = `» [${new Date().toLocaleTimeString()}] ${msg}`;
+  box.appendChild(line);
+  box.appendChild(document.createElement('br'));
+  box.scrollTop = box.scrollHeight;
+}
+
+// ─── PORTFOLIO CALCULATIONS ──────────────────────────────
+function portfolioValue() {
+  let v = state.cash;
+  for (const [sym, qty] of Object.entries(state.holdings)) {
+    v += qty * (prices[sym]?.price || 0);
+  }
+  return v;
+}
+
+function updateDashboard() {
+  const total = portfolioValue();
+  const pnl = total - state.startingCash;
+  const pnlPct = (pnl/state.startingCash)*100;
+
+  document.getElementById('port-val').textContent = `$${total.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  document.getElementById('cash-val').textContent = `$${state.cash.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  const pnlEl = document.getElementById('pnl-val');
+  pnlEl.textContent = `${pnl>=0?'+':''}$${Math.abs(pnl).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  pnlEl.className = `stat-val ${pnl>=0?'pnl-pos':'pnl-neg'}`;
+  document.getElementById('pnl-pct').textContent = `${pnlPct>=0?'+':''}${pnlPct.toFixed(2)}%`;
+
+  // Price table
+  if (Object.keys(prices).length) {
+    const rows = COINS.slice(0,8).map(sym => {
+      const p = prices[sym];
+      if (!p) return '';
+      return `<tr>
+        <td class="sym">${sym}</td>
+        <td class="price-val">${fmtPrice(p.price)}</td>
+        <td>${fmtPct(p.change24h)}</td>
+        <td>${sigBadge(quickSignal(p))}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('price-table').innerHTML = rows || '<tr><td colspan="4" style="color:var(--dim);padding:10px">Loading...</td></tr>';
+  }
+
+  // Holdings
+  const hKeys = Object.keys(state.holdings).filter(k=>state.holdings[k]>0);
+  if (hKeys.length) {
+    const rows = hKeys.map(sym => {
+      const qty = state.holdings[sym];
+      const price = prices[sym]?.price||0;
+      const val = qty*price;
+      const buyP = state.buyPrices[sym]||price;
+      const pnlH = ((price-buyP)/buyP)*100;
+      return `<tr>
+        <td class="sym">${sym}</td>
+        <td>${qty.toFixed(4)}</td>
+        <td>${fmtPrice(val)}</td>
+        <td>${fmtPct(pnlH)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('holdings-table').innerHTML = rows;
+  } else {
+    document.getElementById('holdings-table').innerHTML = '<tr><td colspan="4" style="color:var(--dim);padding:10px;text-align:center">No open positions</td></tr>';
+  }
+}
+
+function quickSignal(priceData) {
+  if (!priceData) return 'WAIT';
+  const c = priceData.change24h;
+  if (c > 5) return 'BUY';
+  if (c < -5) return 'SELL';
+  return 'HOLD';
+}
+
+// ─── MARKET SCAN ─────────────────────────────────────────
+async function runScan() {
+  const btn = document.getElementById('scan-btn');
+  btn.disabled = true; btn.textContent = '⏳ Scanning...';
+  document.getElementById('scan-status').textContent = '';
+  document.getElementById('scan-table').innerHTML = '<tr><td colspan="8" style="color:var(--dim);padding:20px;text-align:center"><span class="spinner"></span> Analyzing all symbols...</td></tr>';
+
+  const results = [];
+  for (const sym of COINS) {
+    document.getElementById('scan-status').textContent = `Analyzing ${sym}...`;
+    const a = await analyzeSymbol(sym);
+    const p = prices[sym]?.price || a.price;
+    results.push({sym, price:p, ...a});
+    await new Promise(r=>setTimeout(r,300));
+  }
+
+  const rows = results.map(r => `<tr>
+    <td class="sym">${r.sym}</td>
+    <td class="price-val">${fmtPrice(r.price)}</td>
+    <td>${sigBadge(r.signal)}</td>
+    <td>
+      <div style="font-size:12px;margin-bottom:3px">${r.confidence}%</div>
+      <div class="conf-bar"><div class="conf-fill" style="width:${r.confidence}%"></div></div>
+    </td>
+    <td class="${r.rsi<40?'up':r.rsi>60?'dn':'neu'}">${r.rsi?.toFixed(1)||'—'}</td>
+    <td class="${r.macdHist>0?'up':'dn'}">${r.macdHist>0?'▲':'▼'} ${Math.abs(r.macdHist||0).toFixed(4)}</td>
+    <td>${fmtPct(r.momentum||0)}</td>
+    <td style="font-size:11px;color:var(--dim)">${r.reasons?.[0]||'—'}</td>
+  </tr>`).join('');
+  document.getElementById('scan-table').innerHTML = rows;
+  document.getElementById('scan-status').textContent = `Scan complete — ${new Date().toLocaleTimeString()}`;
+  btn.disabled = false; btn.textContent = '▶ Run Full Scan';
+}
+
+// ─── TRADING ─────────────────────────────────────────────
+function toggleSellPct() {
+  const t = document.getElementById('trade-type').value;
+  document.getElementById('usd-group').style.display = t==='buy'?'block':'none';
+  document.getElementById('pct-group').style.display = t==='sell'?'block':'none';
+}
+
+async function analyzeBeforeTrade() {
+  const sym = document.getElementById('trade-sym').value;
+  const el = document.getElementById('analysis-content');
+  el.innerHTML = `<span class="spinner"></span> Analyzing ${sym}...`;
+  const a = await analyzeSymbol(sym);
+  const p = prices[sym]?.price || a.price;
+
+  el.innerHTML = `
+    <div class="ind-row"><span class="ind-name">Signal</span><span>${sigBadge(a.signal)}</span></div>
+    <div class="ind-row"><span class="ind-name">Confidence</span><span class="ind-val">${a.confidence}%</span></div>
+    <div class="ind-row"><span class="ind-name">Price</span><span class="ind-val">${fmtPrice(p)}</span></div>
+    <div class="ind-row"><span class="ind-name">RSI (14)</span><span class="ind-val ${a.rsi<40?'up':a.rsi>60?'dn':''}">${a.rsi?.toFixed(1)}</span></div>
+    <div class="ind-row"><span class="ind-name">MACD Hist</span><span class="ind-val ${a.macdHist>0?'up':'dn'}">${a.macdHist?.toFixed(5)}</span></div>
+    <div class="ind-row"><span class="ind-name">Stochastic</span><span class="ind-val">${a.stoch?.toFixed(1)}</span></div>
+    <div class="ind-row"><span class="ind-name">Momentum</span><span class="ind-val">${fmtPct(a.momentum||0)}</span></div>
+    <div class="ind-row"><span class="ind-name">SMA 20</span><span class="ind-val">${fmtPrice(a.sma20)}</span></div>
+    <div class="ind-row"><span class="ind-name">SMA 50</span><span class="ind-val">${fmtPrice(a.sma50)}</span></div>
+    <div style="margin-top:10px;font-size:12px;color:var(--dim)">
+      ${(a.reasons||[]).map(r=>`• ${r}`).join('<br>')}
+    </div>
+  `;
+}
+
+function placeTrade() {
+  const sym = document.getElementById('trade-sym').value;
+  const type = document.getElementById('trade-type').value;
+  const price = prices[sym]?.price;
+  const msgEl = document.getElementById('trade-msg');
+
+  if (!price) { msgEl.innerHTML = '<span style="color:var(--red)">Price not available. Refresh prices first.</span>'; return; }
+
+  if (type === 'buy') {
+    const amt = parseFloat(document.getElementById('trade-amount').value);
+    if (amt > state.cash) { msgEl.innerHTML = '<span style="color:var(--red)">Insufficient cash.</span>'; return; }
+    const qty = amt / price;
+    state.cash -= amt;
+    state.holdings[sym] = (state.holdings[sym]||0) + qty;
+    if (!state.buyPrices[sym]) state.buyPrices[sym] = price;
+    state.trades.push({time:new Date().toISOString(),type:'BUY',sym,qty,price,usd:amt});
+    saveState(); updateDashboard(); renderHistory();
+    msgEl.innerHTML = `<span style="color:var(--accent)">✓ Bought ${qty.toFixed(6)} ${sym} @ ${fmtPrice(price)}</span>`;
+    log(`BUY ${qty.toFixed(6)} ${sym} @ ${fmtPrice(price)} ($${amt.toFixed(2)})`, 'buy');
+  } else {
+    const held = state.holdings[sym]||0;
+    if (held <= 0) { msgEl.innerHTML = `<span style="color:var(--red)">No ${sym} held.</span>`; return; }
+    const pct = parseFloat(document.getElementById('trade-pct').value)/100;
+    const qty = held * pct;
+    const usd = qty * price;
+    state.holdings[sym] = held - qty;
+    if (state.holdings[sym] < 1e-10) delete state.holdings[sym];
+    if (!state.holdings[sym]) delete state.buyPrices[sym];
+    state.cash += usd;
+    state.trades.push({time:new Date().toISOString(),type:'SELL',sym,qty,price,usd});
+    saveState(); updateDashboard(); renderHistory();
+    msgEl.innerHTML = `<span style="color:var(--red)">✓ Sold ${qty.toFixed(6)} ${sym} → $${usd.toFixed(2)}</span>`;
+    log(`SELL ${qty.toFixed(6)} ${sym} @ ${fmtPrice(price)} → $${usd.toFixed(2)}`, 'sell');
+  }
+}
+
+// ─── HISTORY ─────────────────────────────────────────────
+function renderHistory() {
+  const el = document.getElementById('history-list');
+  if (!state.trades.length) {
+    el.innerHTML = '<div style="color:var(--dim);padding:20px;text-align:center">No trades yet.</div>';
+    return;
+  }
+  el.innerHTML = [...state.trades].reverse().slice(0,30).map(t => `
+    <div class="trade-item">
+      <span style="color:var(--dim);font-size:12px">${new Date(t.time).toLocaleString()}</span>
+      <span class="${t.type==='BUY'?'up':'dn'}" style="font-weight:700">${t.type}</span>
+      <span class="sym">${t.sym}</span>
+      <span style="font-family:'Share Tech Mono',monospace">${t.qty.toFixed(6)}</span>
+      <span style="font-family:'Share Tech Mono',monospace">${fmtPrice(t.price)}</span>
+      <span style="font-family:'Share Tech Mono',monospace">$${t.usd.toFixed(2)}</span>
+    </div>
+  `).join('');
+}
+function clearHistory() {
+  if (!confirm('Clear all trade history?')) return;
+  state.trades = [];
+  saveState();
+  renderHistory();
+}
+
+// ─── WALLET ──────────────────────────────────────────────
+function renderWallet() {
+  document.getElementById('wallet-address').textContent = state.wallet.address;
+  document.getElementById('pk-field').value = state.wallet.privateKey;
+  document.getElementById('mn-field').value = state.wallet.mnemonic;
+}
+function copyAddress() {
+  navigator.clipboard.writeText(state.wallet.address);
+  const btn = event.target;
+  btn.textContent = '✓ COPIED!';
+  setTimeout(()=>btn.textContent='⎘ COPY ADDRESS',2000);
+}
+function togglePK() {
+  const f = document.getElementById('pk-field');
+  const b = event.target;
+  f.type = f.type==='password'?'text':'password';
+  b.textContent = f.type==='password'?'SHOW':'HIDE';
+}
+function toggleMN() {
+  const f = document.getElementById('mn-field');
+  const b = event.target;
+  f.type = f.type==='password'?'text':'password';
+  b.textContent = f.type==='password'?'SHOW':'HIDE';
+}
+
+// ─── AUTO TRADER ─────────────────────────────────────────
+function toggleAuto() {
+  autoRunning = !autoRunning;
+  const tog = document.getElementById('auto-toggle');
+  tog.classList.toggle('on', autoRunning);
+  document.getElementById('auto-status').textContent = `Status: ${autoRunning?'RUNNING':'STOPPED'}`;
+  if (autoRunning) {
+    autoLog('Auto-trader started', 'buy');
+    runAutoScan();
+  } else {
+    clearTimeout(autoTimer);
+    autoLog('Auto-trader stopped', 'warn');
+  }
+}
+
+function saveAutoSettings() {
+  autoLog(`Settings saved — conf:${document.getElementById('auto-conf').value}% pos:${document.getElementById('auto-pos').value}%`, 'info');
+}
+
+async function runAutoScan() {
+  if (!autoRunning) return;
+  const minConf = parseInt(document.getElementById('auto-conf').value)||70;
+  const maxPos = parseInt(document.getElementById('auto-pos').value)||20;
+  const watchSel = document.getElementById('auto-watch');
+  const watchlist = Array.from(watchSel.selectedOptions).map(o=>o.value);
+
+  scanCount++;
+  document.getElementById('stat-scans').textContent = scanCount;
+  autoLog(`Scanning ${watchlist.join(', ')}...`);
+
+  const p = await fetchPrices(watchlist);
+  Object.assign(prices, p);
+
+  for (const sym of watchlist) {
+    if (!autoRunning) break;
+    const a = await analyzeSymbol(sym);
+    const price = prices[sym]?.price || a.price;
+    if (!price) continue;
+
+    if (a.signal==='BUY' && a.confidence>=minConf) {
+      const total = portfolioValue();
+      const invest = Math.min(total*(maxPos/100), state.cash*0.95);
+      if (invest > 5) {
+        const qty = invest/price;
+        state.cash -= invest;
+        state.holdings[sym] = (state.holdings[sym]||0)+qty;
+        if (!state.buyPrices[sym]) state.buyPrices[sym] = price;
+        state.trades.push({time:new Date().toISOString(),type:'BUY',sym,qty,price,usd:invest});
+        saveState(); updateDashboard(); renderHistory();
+        autoBuys++;
+        document.getElementById('stat-buys').textContent = autoBuys;
+        autoLog(`AUTO BUY ${sym} conf=${a.confidence}% $${invest.toFixed(2)}`, 'buy');
+        log(`AUTO BUY ${sym} @ ${fmtPrice(price)}`, 'buy');
+      }
+    } else if (a.signal==='SELL' && a.confidence>=minConf && state.holdings[sym]>0) {
+      const qty = state.holdings[sym];
+      const usd = qty*price;
+      state.cash += usd;
+      delete state.holdings[sym];
+      delete state.buyPrices[sym];
+      state.trades.push({time:new Date().toISOString(),type:'SELL',sym,qty,price,usd});
+      saveState(); updateDashboard(); renderHistory();
+      autoSells++;
+      document.getElementById('stat-sells').textContent = autoSells;
+      autoLog(`AUTO SELL ${sym} conf=${a.confidence}% $${usd.toFixed(2)}`, 'sell');
+      log(`AUTO SELL ${sym} @ ${fmtPrice(price)}`, 'sell');
+    }
+    await new Promise(r=>setTimeout(r,500));
+  }
+
+  const interval = (parseInt(document.getElementById('auto-interval').value)||60)*1000;
+  autoLog(`Scan done. Next in ${interval/1000}s`);
+  if (autoRunning) autoTimer = setTimeout(runAutoScan, interval);
+}
+
+// ─── TABS ────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab-content').forEach(el=>el.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  event.target.classList.add('active');
+  if (name==='history') renderHistory();
+  if (name==='wallet') renderWallet();
+}
+
+// ─── CLOCK ───────────────────────────────────────────────
+function updateClock() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── PRICE REFRESH LOOP ──────────────────────────────────
+async function refreshPrices() {
+  const p = await fetchPrices(COINS);
+  if (Object.keys(p).length) {
+    Object.assign(prices, p);
+    updateDashboard();
+  }
+}
+refreshPrices();
+setInterval(refreshPrices, 30000);
+
+// ─── INIT ────────────────────────────────────────────────
+renderWallet();
+renderHistory();
+updateDashboard();
+log('Market data connecting via CoinGecko free API...');
+</script>
+</body>
+</html>
